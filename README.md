@@ -1,5 +1,5 @@
 # ktZ85
-ktZ85 provides an implementation of the Z85 codec following the [zeromq rfc](rfc.zeromq.org/spec:32/Z85).
+ktZ85 provides an implementation of the Z85 codec following the [zeromq rfc](https://rfc.zeromq.org/spec/32/).
 
 ## Examples
 ```kotlin
