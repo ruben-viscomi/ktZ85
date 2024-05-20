@@ -24,12 +24,8 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 //  DEALINGS IN THE SOFTWARE.
 //  --------------------------------------------------------------------------
-package implementations
 
-import interfaces.Decoder
-import interfaces.Encoder
-
-object Z85 : Encoder, Decoder {
+object Z85 {
 
     private val Z85_ENCODER = arrayOf(
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -58,7 +54,7 @@ object Z85 : Encoder, Decoder {
         0x21u, 0x22u, 0x23u, 0x4Fu, 0x00u, 0x50u, 0x00u, 0x00u
     )
 
-    override fun encode(data: ByteArray): String {
+    fun encode(data: ByteArray): String {
         val sizeRemainder = data.size % 4
         val requiresPadding = sizeRemainder != 0
         
@@ -93,7 +89,7 @@ object Z85 : Encoder, Decoder {
             .toString()
     }
 
-    override fun decode(data: String): ByteArray {
+    fun decode(data: String): ByteArray {
         val lengthRemainder = data.length % 5
         val requiresPadding = lengthRemainder != 0
 

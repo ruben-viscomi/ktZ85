@@ -1,4 +1,3 @@
-import implementations.Z85
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertAll
 import kotlin.test.assertEquals
@@ -14,7 +13,7 @@ private val TESTS = listOf(
     Pair("The quick brown 🦊 jumps over 13 lazy 🐶.".toByteArray(), "ra]?=ADL#9yAN8bz*c7w[sMOnazM4oAc0duC4CXpf/6}*vs0hw[sL/Je=")
 )
 
-class Tests {
+class TestsZ85 {
     @Test
     fun testEncoding() {
         assertAll("Testing encoding", encoding_assertions())
