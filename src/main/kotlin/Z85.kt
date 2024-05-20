@@ -54,6 +54,11 @@ object Z85 {
         0x21u, 0x22u, 0x23u, 0x4Fu, 0x00u, 0x50u, 0x00u, 0x00u
     )
 
+    /**
+     * Encode bytes to Z85 (base85) string.
+     * @param data the bytes to encode.
+     * @return the encoded data in base85 string (Z85) variant.
+     */
     fun encode(data: ByteArray): String {
         val sizeRemainder = data.size % 4
         val requiresPadding = sizeRemainder != 0
@@ -89,6 +94,11 @@ object Z85 {
             .toString()
     }
 
+    /**
+     * Decode Z85 (base85) string to bytes.
+     * @param data the string to decode.
+     * @return the decoded bytes.
+     */
     fun decode(data: String): ByteArray {
         val lengthRemainder = data.length % 5
         val requiresPadding = lengthRemainder != 0
