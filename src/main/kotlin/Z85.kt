@@ -27,7 +27,7 @@
 
 object Z85 {
 
-    private val Z85_ENCODER = arrayOf(
+    private val Z85_ENCODER = charArrayOf(
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
         'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
         'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
@@ -60,38 +60,52 @@ object Z85 {
      * @return the encoded data in base85 string (Z85) variant.
      */
     fun encode(data: ByteArray): String {
+        if (data.size <= 0)
+            return ""
+
         val sizeRemainder = data.size % 4
-        val requiresPadding = sizeRemainder != 0
-        
-        val padSize = if (requiresPadding) 4 - sizeRemainder else 0
-        val normalizedData =
-            if (requiresPadding)
-                ByteArray(data.size + padSize) { data.getOrNull(it) ?: 0 }
-            else
-                data
+        val padSize = if (sizeRemainder != 0) 4 - sizeRemainder else 0
 
-        val encodedSize = normalizedData.size * 5 / 4
-        val encoded = StringBuilder(encodedSize)
+        val encodedSize = ((data.size + padSize) * 5 / 4) - padSize
+        val encoded = CharArray(encodedSize)
 
-        for (byteCount in normalizedData.indices step 4) {
+        var charCount = 0
+        var byteCount = 0
+
+        while (byteCount < data.size - 4) {
             // Accumulate value in base 256 (binary)
-            var value = 0u
-            value = value * 256u + normalizedData[byteCount].toUByte()
-            value = value * 256u + normalizedData[byteCount + 1].toUByte()
-            value = value * 256u + normalizedData[byteCount + 2].toUByte()
-            value = value * 256u + normalizedData[byteCount + 3].toUByte()
+            val value = (getByteAsUintDefaulted(data, byteCount) shl 24) +
+                    (getByteAsUintDefaulted(data, byteCount + 1) shl 16) +
+                    (getByteAsUintDefaulted(data, byteCount + 2) shl 8) +
+                    getByteAsUintDefaulted(data, byteCount + 3)
+            byteCount += 4
 
             // Output value in base85
-            encoded.append(Z85_ENCODER[(value / 52_200_625u % 85u).toInt()])
-                .append(Z85_ENCODER[(value / 614_125u % 85u).toInt()])
-                .append(Z85_ENCODER[(value / 7_225u % 85u).toInt()])
-                .append(Z85_ENCODER[(value / 85u % 85u).toInt()])
-                .append(Z85_ENCODER[(value % 85u).toInt()])
+            encoded[charCount] = Z85_ENCODER[(value / 52_200_625u % 85u).toInt()]
+            encoded[charCount + 1] = Z85_ENCODER[(value / 614_125u % 85u).toInt()]
+            encoded[charCount + 2] = Z85_ENCODER[(value / 7_225u % 85u).toInt()]
+            encoded[charCount + 3] = Z85_ENCODER[(value / 85u % 85u).toInt()]
+            encoded[charCount + 4] = Z85_ENCODER[(value % 85u).toInt()]
+            charCount += 5
         }
 
-        return encoded
-            .removeRange(encoded.length - padSize, encoded.length)
-            .toString()
+        val value = (getByteAsUintDefaulted(data, byteCount) shl 24) +
+                (getByteAsUintDefaulted(data, byteCount + 1) shl 16) +
+                (getByteAsUintDefaulted(data, byteCount + 2) shl 8) +
+                getByteAsUintDefaulted(data, byteCount + 3)
+
+        encoded[charCount] = Z85_ENCODER[(value / 52_200_625u % 85u).toInt()]
+        encoded[charCount + 1] = Z85_ENCODER[(value / 614_125u % 85u).toInt()]
+        if (charCount + 2 < encodedSize) {
+            encoded[charCount + 2] = Z85_ENCODER[(value / 7_225u % 85u).toInt()]
+            if (charCount + 3 < encodedSize) {
+                encoded[charCount + 3] = Z85_ENCODER[(value / 85u % 85u).toInt()]
+                if (charCount + 4 < encodedSize)
+                    encoded[charCount + 4] = Z85_ENCODER[(value % 85u).toInt()]
+            }
+        }
+
+        return encoded.concatToString()
     }
 
     /**
@@ -100,44 +114,61 @@ object Z85 {
      * @return the decoded bytes.
      */
     fun decode(data: String): ByteArray {
+        if (data.length <= 0)
+            return ByteArray(0)
+
         val lengthRemainder = data.length % 5
         val requiresPadding = lengthRemainder != 0
 
         val padSize = if (requiresPadding) 5 - lengthRemainder else 0
 
-        val decoded = mutableListOf<Byte>()
+        val decoded = ByteArray(((data.length + padSize) * 4 / 5) - padSize)
 
-        for (charCount in data.indices step 5) {
+        var charCount = 0
+        var byteCount = 0
+
+        while (charCount < data.length - 5) {
             // Accumulate value in base85
-            var value = 0u
-            value = value * 85u + Z85_DECODER[data[charCount].code - 32]
-            value = value * 85u + Z85_DECODER[data[charCount + 1].code - 32]
-            value = value * 85u + (charCount + 2).let {
-                if (it < data.length)
-                    Z85_DECODER[data[it].code - 32]
-                else
-                    84u
-            }
-            value = value * 85u + (charCount + 3).let {
-                if (it < data.length)
-                    Z85_DECODER[data[it].code - 32]
-                else
-                    84u
-            }
-            value = value * 85u + (charCount + 4).let {
-                if (it < data.length)
-                    Z85_DECODER[data[it].code - 32]
-                else
-                    84u
-            }
+            val value = Z85_DECODER[data[charCount].code - 32] * 52_200_625u +
+                    Z85_DECODER[data[charCount + 1].code - 32] * 614_125u +
+                    getCharAsUintOrDefault(Z85_DECODER, data, charCount + 2) * 7_225u +
+                    getCharAsUintOrDefault(Z85_DECODER, data, charCount + 3) * 85u +
+                    getCharAsUintOrDefault(Z85_DECODER, data, charCount + 4)
+            charCount += 5
 
-            decoded.add((value / 16_777_216u % 256u).toByte())
-            decoded.add((value / 65_536u % 256u).toByte())
-            decoded.add((value / 256u % 256u).toByte())
-            decoded.add((value  % 256u).toByte())
+            decoded[byteCount] = (value / 16_777_216u % 256u).toByte()
+            decoded[byteCount + 1] = (value / 65_536u % 256u).toByte()
+            decoded[byteCount + 2] = (value / 256u % 256u).toByte()
+            decoded[byteCount + 3] = (value  % 256u).toByte()
+            byteCount += 4
         }
 
-        return decoded.subList(0, decoded.size - padSize).toByteArray()
+        val value = Z85_DECODER[data[charCount].code - 32] * 52_200_625u +
+                Z85_DECODER[data[charCount + 1].code - 32] * 614_125u +
+                getCharAsUintOrDefault(Z85_DECODER, data, charCount + 2) * 7_225u +
+                getCharAsUintOrDefault(Z85_DECODER, data, charCount + 3) * 85u +
+                getCharAsUintOrDefault(Z85_DECODER, data, charCount + 4)
+
+        decoded[byteCount] = (value / 16_777_216u % 256u).toByte()
+        if (byteCount + 1 < decoded.size) {
+            decoded[byteCount + 1] = (value / 65_536u % 256u).toByte()
+            if (byteCount + 2 < decoded.size) {
+                decoded[byteCount + 2] = (value / 256u % 256u).toByte()
+                if (byteCount + 3 < decoded.size) {
+                    decoded[byteCount + 3] = (value % 256u).toByte()
+                }
+            }
+        }
+
+        return decoded
     }
 
 }
+
+@Suppress("NOTHING_TO_INLINE")
+private inline fun getByteAsUintDefaulted(data: ByteArray, i: Int) =
+    if (i < data.size) data[i].toUByte().toUInt() else 0u
+
+@Suppress("NOTHING_TO_INLINE")
+private inline fun getCharAsUintOrDefault(data: Array<UByte>, encoded: String, i: Int) =
+    if (i < encoded.length) data[encoded[i].code - 32] else 84u
