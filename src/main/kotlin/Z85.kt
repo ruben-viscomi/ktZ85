@@ -60,7 +60,7 @@ object Z85 {
      * @return the encoded data in base85 string (Z85) variant.
      */
     fun encode(data: ByteArray): String {
-        if (data.size <= 0)
+        if (data.size < 1)
             return ""
 
         val sizeRemainder = data.size % 4
@@ -72,7 +72,9 @@ object Z85 {
         var charCount = 0
         var byteCount = 0
 
-        while (byteCount < data.size - 4) {
+        val safeUnrolledSize = data.size - 4
+
+        while (byteCount < safeUnrolledSize) {
             // Accumulate value in base 256 (binary)
             val value = (getByteAsUintDefaulted(data, byteCount) shl 24) +
                     (getByteAsUintDefaulted(data, byteCount + 1) shl 16) +
@@ -81,10 +83,10 @@ object Z85 {
             byteCount += 4
 
             // Output value in base85
-            encoded[charCount] = Z85_ENCODER[(value / 52_200_625u % 85u).toInt()]
-            encoded[charCount + 1] = Z85_ENCODER[(value / 614_125u % 85u).toInt()]
-            encoded[charCount + 2] = Z85_ENCODER[(value / 7_225u % 85u).toInt()]
-            encoded[charCount + 3] = Z85_ENCODER[(value / 85u % 85u).toInt()]
+            encoded[charCount] = Z85_ENCODER[(value / 52_200_625u).toInt()]
+            encoded[charCount + 1] = Z85_ENCODER[(value / 614_125u).toInt() % 85]
+            encoded[charCount + 2] = Z85_ENCODER[(value / 7_225u).toInt() % 85]
+            encoded[charCount + 3] = Z85_ENCODER[(value / 85u).toInt() % 85]
             encoded[charCount + 4] = Z85_ENCODER[(value % 85u).toInt()]
             charCount += 5
         }
@@ -94,12 +96,12 @@ object Z85 {
                 (getByteAsUintDefaulted(data, byteCount + 2) shl 8) +
                 getByteAsUintDefaulted(data, byteCount + 3)
 
-        encoded[charCount] = Z85_ENCODER[(value / 52_200_625u % 85u).toInt()]
-        encoded[charCount + 1] = Z85_ENCODER[(value / 614_125u % 85u).toInt()]
+        encoded[charCount] = Z85_ENCODER[(value / 52_200_625u).toInt()]
+        encoded[charCount + 1] = Z85_ENCODER[(value / 614_125u).toInt() % 85]
         if (charCount + 2 < encodedSize) {
-            encoded[charCount + 2] = Z85_ENCODER[(value / 7_225u % 85u).toInt()]
+            encoded[charCount + 2] = Z85_ENCODER[(value / 7_225u).toInt() % 85]
             if (charCount + 3 < encodedSize) {
-                encoded[charCount + 3] = Z85_ENCODER[(value / 85u % 85u).toInt()]
+                encoded[charCount + 3] = Z85_ENCODER[(value / 85u).toInt() % 85]
                 if (charCount + 4 < encodedSize)
                     encoded[charCount + 4] = Z85_ENCODER[(value % 85u).toInt()]
             }
@@ -114,8 +116,8 @@ object Z85 {
      * @return the decoded bytes.
      */
     fun decode(data: String): ByteArray {
-        if (data.length <= 0)
-            return ByteArray(0)
+        if (data.length < 1)
+            return byteArrayOf()
 
         val lengthRemainder = data.length % 5
         val requiresPadding = lengthRemainder != 0
@@ -127,7 +129,9 @@ object Z85 {
         var charCount = 0
         var byteCount = 0
 
-        while (charCount < data.length - 5) {
+        val safeUnrolledSize = data.length - 5
+
+        while (charCount < safeUnrolledSize) {
             // Accumulate value in base85
             val value = Z85_DECODER[data[charCount].code - 32] * 52_200_625u +
                     Z85_DECODER[data[charCount + 1].code - 32] * 614_125u +
@@ -154,9 +158,8 @@ object Z85 {
             decoded[byteCount + 1] = (value / 65_536u % 256u).toByte()
             if (byteCount + 2 < decoded.size) {
                 decoded[byteCount + 2] = (value / 256u % 256u).toByte()
-                if (byteCount + 3 < decoded.size) {
+                if (byteCount + 3 < decoded.size)
                     decoded[byteCount + 3] = (value % 256u).toByte()
-                }
             }
         }
 
@@ -167,7 +170,7 @@ object Z85 {
 
 @Suppress("NOTHING_TO_INLINE")
 private inline fun getByteAsUintDefaulted(data: ByteArray, i: Int) =
-    if (i < data.size) data[i].toUByte().toUInt() else 0u
+    if (i < data.size) data[i].toUInt() and 0xFFu else 0u
 
 @Suppress("NOTHING_TO_INLINE")
 private inline fun getCharAsUintOrDefault(data: Array<UByte>, encoded: String, i: Int) =
